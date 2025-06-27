@@ -31,14 +31,20 @@ namespace FolderSizeSearcher
             var foldersSize = new List<FolderSize>();
             var currentUser = GetCurrentSID();
             var countTask = 0;
-
+            var enumerationOptions = new EnumerationOptions
+            {
+                RecurseSubdirectories = false,
+                AttributesToSkip = FileAttributes.None,
+                IgnoreInaccessible = true,
+                ReturnSpecialDirectories = true
+            };
             void getFolderSize(string path, FolderSize? parentFolder = null)
             {
                 long totalSize = 0;
 
                 try
                 {
-                    var files = Directory.GetFiles(path);
+                    var files = Directory.GetFiles(path, "*", enumerationOptions);
                     foreach (var file in files)
                     {
                         var fileInfo = new FileInfo(file);
@@ -70,9 +76,13 @@ namespace FolderSizeSearcher
             {
                 try
                 {
-                    var folders = Directory.GetDirectories(parentFolder.Path);
+                    var folders = Directory.GetDirectories(parentFolder.Path, "*", enumerationOptions);
                     foreach (var folder in folders)
                     {
+                        if (folder.EndsWith("\\..") ||
+                            folder.EndsWith("\\."))
+                            continue;
+
                         Interlocked.Increment(ref countTask);
 
                         Task.Run(() =>

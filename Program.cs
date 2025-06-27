@@ -11,7 +11,7 @@ namespace FolderSizeSearcher
                 var parameter = FolderSizeSearcherParameterFactory.GetParameter(args);
 
                 var output = OutputFactory.GetOutput(OutputType.Console);
-                
+
                 new FolderSizeSearcher(output)
                     .Search(parameter);
             }
