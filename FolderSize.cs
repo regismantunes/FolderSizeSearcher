@@ -1,19 +1,12 @@
 ﻿namespace FolderSizeSearcher
 {
-    public class FolderSize
+    public class FolderSize(string path, long topOnlySize)
     {
         private FolderSize? _parentFolder;
 
-        public FolderSize(string path, long topOnlySize)
-        {
-            Path = path;
-            TopOnlySize = topOnlySize;
-            FullSize = topOnlySize;
-        }
-
-        public string Path { get; }
-        public long TopOnlySize { get; }
-        public long FullSize { get; private set; }
+        public string Path { get; } = path;
+        public long TopOnlySize { get; } = topOnlySize;
+        public long FullSize { get; private set; } = topOnlySize;
 
         private void SumSubFolderSize(long subFolderTopOnlySize)
         {

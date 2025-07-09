@@ -1,19 +1,14 @@
-﻿using FolderSizeSearcher.Extensions;
-using FolderSizeSearcher.Output;
+﻿using RA.Utilities.Extensions;
+using RA.Utilities.Output;
 using System.Diagnostics;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
 namespace FolderSizeSearcher
 {
-    public class FolderSizeSearcher
+    public class FolderSizeSearcher(IOutput output)
     {
-        public IOutput Output { get; }
-
-        public FolderSizeSearcher(IOutput output)
-        {
-            Output = output;
-        }
+        public IOutput Output { get; } = output;
 
         public void Search(FolderSizeSearcherParameter parameter)
         {
@@ -38,6 +33,7 @@ namespace FolderSizeSearcher
                 IgnoreInaccessible = true,
                 ReturnSpecialDirectories = true
             };
+
             void getFolderSize(string path, FolderSize? parentFolder = null)
             {
                 long totalSize = 0;

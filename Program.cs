@@ -1,4 +1,4 @@
-﻿using FolderSizeSearcher.Output;
+﻿using RA.Utilities.Output;
 
 namespace FolderSizeSearcher
 {
