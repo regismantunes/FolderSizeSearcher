@@ -1,4 +1,5 @@
 ﻿using RA.Utilities.Extensions;
+using RA.Utilities.Folder;
 using RA.Utilities.Output;
 using System.Diagnostics;
 using System.Security.AccessControl;
@@ -9,13 +10,14 @@ namespace FolderSizeSearcher
     public class FolderSizeSearcher(IOutput output)
     {
         public IOutput Output { get; } = output;
+        private FolderSearcher FolderSearcher { get; } = new FolderSearcher();
 
-        public void Search(FolderSizeSearcherParameter parameter)
+        public async Task SearchAsync(FolderSizeSearcherParameter parameter)
         {
-            Search(parameter.InitialPath, parameter.Taken);
+            await SearchAsync(parameter.InitialPath, parameter.Taken);
         }
 
-        public void Search(string initialPath, int taken)
+        public async Task SearchAsync(string initialPath, int taken)
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -23,96 +25,41 @@ namespace FolderSizeSearcher
             Output.WriteLine("Executing folder size searcher.");
             Output.WriteLine("This process can take some minutes...");
 
-            var foldersSize = new List<FolderSize>();
-            var currentUser = GetCurrentSID();
-            var countTask = 0;
-            var enumerationOptions = new EnumerationOptions
+            var folderSearcherOptions = new FolderSearcherOptions
             {
-                RecurseSubdirectories = false,
-                AttributesToSkip = FileAttributes.None,
-                IgnoreInaccessible = true,
-                ReturnSpecialDirectories = true
+                FileSystemRights = FileSystemRights.Delete,
+                InitialPath = initialPath,
+                FindForFiles = true,
+                FindForDirectories = true,
             };
 
-            void getFolderSize(string path, FolderSize? parentFolder = null)
+            var foldersSize = new FolderSizeCollection();
+
+            var taskSearcher = FolderSearcher.SearchAsync(folderSearcherOptions, path =>
             {
-                long totalSize = 0;
-
-                try
+                if (Directory.Exists(path))
+                    foldersSize.AddSize(path, 0);
+                else
                 {
-                    var files = Directory.GetFiles(path, "*", enumerationOptions);
-                    foreach (var file in files)
-                    {
-                        var fileInfo = new FileInfo(file);
-                        var rules = fileInfo.GetAccessControl()
-                                            .GetAccessRules(true, true, typeof(SecurityIdentifier));
-                        foreach (FileSystemAccessRule rule in rules)
-                        {
-                            if (rule.IdentityReference.Value == currentUser &&
-                                (rule.FileSystemRights & FileSystemRights.Delete) == FileSystemRights.Delete &&
-                                rule.AccessControlType == AccessControlType.Allow)
-                            {
-                                totalSize += fileInfo.Length;
-                                break;
-                            }
-                        }
-                    }
+                    var fileInfo = new FileInfo(path);
+                    foldersSize.AddSize(fileInfo.DirectoryName, fileInfo.Length);
                 }
-                catch { }
-
-                var folderSize = parentFolder?.CreateSubFolder(path, totalSize) ?? new FolderSize(path, totalSize);
-
-                getSubFoldersSize(folderSize);
-
-                lock (foldersSize)
-                    foldersSize.Add(folderSize);
-            }
-
-            void getSubFoldersSize(FolderSize parentFolder)
-            {
-                try
-                {
-                    var folders = Directory.GetDirectories(parentFolder.Path, "*", enumerationOptions);
-                    foreach (var folder in folders)
-                    {
-                        if (folder.EndsWith("\\..") ||
-                            folder.EndsWith("\\."))
-                            continue;
-
-                        Interlocked.Increment(ref countTask);
-
-                        Task.Run(() =>
-                        {
-                            getFolderSize(folder, parentFolder);
-                            Interlocked.Decrement(ref countTask);
-                        });
-                    }
-                }
-                catch { }
-            }
-
-            getFolderSize(initialPath);
+            });
 
             Output.WriteLine(initialPath);
-            while (true)
+            while (FolderSearcher.IsRunning)
             {
-                Thread.Sleep(1000);
-
-                if (countTask == 0)
-                    break;
-
-                string lastPath;
-                lock (foldersSize)
-                    lastPath = foldersSize.Last().Path;
-
+                await taskSearcher.DelayOrCompleted(1000);
+                
                 Output.ClearLine();
-                Output.WriteLine(lastPath);
+                Output.WriteLine(FolderSearcher.LastPath);
             }
 
             Output.Clear();
 
-            var result = foldersSize.OrderByDescending(x => x.FullSize)
-                                    .Take(taken);
+            var result = foldersSize.GetFolderSizes()
+                .OrderByDescending(x => x.FullSize)
+                .Take(taken);
 
             foreach (var folder in result)
             {
@@ -137,11 +84,6 @@ namespace FolderSizeSearcher
 
             stopwatch.Stop();
             Output.WriteLine($"Time to execute: {stopwatch.GetElapsedTimeText()}");
-        }
-
-        private static string GetCurrentSID()
-        {
-            return WindowsIdentity.GetCurrent().User?.Value ?? string.Empty;
         }
     }
 }

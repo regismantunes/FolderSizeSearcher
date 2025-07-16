@@ -13,7 +13,8 @@ namespace FolderSizeSearcher
                 var output = OutputFactory.GetOutput(OutputType.Console);
 
                 new FolderSizeSearcher(output)
-                    .Search(parameter);
+                    .SearchAsync(parameter)
+                    .Wait();
             }
             catch (Exception ex)
             {
